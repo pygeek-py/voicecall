@@ -1,60 +1,64 @@
-// Ensure this is at the top of your component file to make it a client component
-"use client";
-
 import { useState, useEffect, useRef } from 'react';
 import Peer from 'peerjs';
 
 export default function Home() {
-    const [peerId, setPeerId] = useState('');
-       const [inputPeerId, setInputPeerId] = useState('');
-       const [callId, setCallId] = useState('');
-       const [peer, setPeer] = useState(null);
-       const [localStream, setLocalStream] = useState(null);
-       const [call, setCall] = useState(null);
-       const [incomingCall, setIncomingCall] = useState(null);
-       const remoteAudioRef = useRef();
-    
-       useEffect(() => {
-         if (peerId) {
-           const peerInstance = new Peer(peerId);
-    
-           peerInstance.on('open', id => {
-             setPeerId(id);
-           });
-    
-           peerInstance.on('call', incomingCall => {
-             setIncomingCall(incomingCall);
-           });
-    
-           peerInstance.on('error', err => {
-             console.error('PeerJS error:', err);
-           });
-    
-           setPeer(peerInstance);
-    
-           return () => {
-             peerInstance.destroy();
-           };
-         }
-       }, [peerId]);
+  const [peerId, setPeerId] = useState('');
+  const [inputPeerId, setInputPeerId] = useState('');
+  const [callId, setCallId] = useState('');
+  const [peer, setPeer] = useState(null);
+  const [localStream, setLocalStream] = useState(null);
+  const [call, setCall] = useState(null);
+  const [incomingCall, setIncomingCall] = useState(null);
+  const remoteAudioRef = useRef();
+  const localAudioRef = useRef(); // Ref for local audio playback
 
+  useEffect(() => {
+    if (peerId) {
+      const peerInstance = new Peer(peerId);
 
-    const initializePeer = () => {
-        setPeerId(inputPeerId);
-    };
+      peerInstance.on('open', id => {
+        setPeerId(id);
+      });
 
-    
+      peerInstance.on('call', incomingCall => {
+        setIncomingCall(incomingCall);
+      });
+
+      peerInstance.on('error', err => {
+        console.error('PeerJS error:', err);
+      });
+
+      setPeer(peerInstance);
+
+      return () => {
+        peerInstance.destroy();
+      };
+    }
+  }, [peerId]);
+
+  const initializePeer = () => {
+    if (!inputPeerId) {
+      alert("Please enter your ID");
+      return;
+    }
+    setPeerId(inputPeerId);
+  };
 
   const answerCall = () => {
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-      setLocalStream(stream);
-      incomingCall.answer(stream);
-      incomingCall.on('stream', remoteStream => {
-        remoteAudioRef.current.srcObject = remoteStream;
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(stream => {
+        setLocalStream(stream);
+        localAudioRef.current.srcObject = stream; // Attach local stream to audio element
+        incomingCall.answer(stream);
+        incomingCall.on('stream', remoteStream => {
+          remoteAudioRef.current.srcObject = remoteStream; // Set remote stream to remote audio element
+        });
+        setCall(incomingCall);
+        setIncomingCall(null);
+      })
+      .catch(err => {
+        console.error('Error accessing media devices:', err);
       });
-      setCall(incomingCall);
-      setIncomingCall(null);
-    });
   };
 
   const declineCall = () => {
@@ -65,14 +69,30 @@ export default function Home() {
   };
 
   const callUser = (id) => {
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-      setLocalStream(stream);
-      const outgoingCall = peer.call(id, stream);
-      outgoingCall.on('stream', remoteStream => {
-        remoteAudioRef.current.srcObject = remoteStream;
+    if (!id) {
+      alert("Please enter the recipient ID");
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(stream => {
+        setLocalStream(stream);
+        localAudioRef.current.srcObject = stream; // Attach local stream to audio element
+        const outgoingCall = peer.call(id, stream);
+        if (outgoingCall) {
+          outgoingCall.on('stream', remoteStream => {
+            remoteAudioRef.current.srcObject = remoteStream; // Set remote stream to remote audio element
+          });
+          outgoingCall.on('error', err => {
+            console.error('Outgoing call error:', err);
+          });
+          setCall(outgoingCall);
+        } else {
+          console.error('Failed to initiate call.');
+        }
+      })
+      .catch(err => {
+        console.error('Error accessing media devices:', err);
       });
-      setCall(outgoingCall);
-    });
   };
 
   const endCall = () => {
@@ -85,45 +105,186 @@ export default function Home() {
       setLocalStream(null);
     }
     remoteAudioRef.current.srcObject = null;
+    localAudioRef.current.srcObject = null; // Clear local audio playback
   };
 
   return (
     <div>
-      <h1>PeerJS Voice Call</h1>
+      <h1>Carsle Voice Call</h1>
       {!peerId ? (
         <div>
-           <input
-             type="text"
-             placeholder="Enter your ID"
-             value={inputPeerId}
-             onChange={(e) => setInputPeerId(e.target.value)}
-           />
-           <button onClick={initializePeer}>Set My ID</button>
-         </div>
-       ) : (
-         <div>
-           <h2>Your ID: {peerId}</h2>
-           <input
-             type="text"
-             placeholder="Enter recipient ID"
-             value={callId}
-             onChange={(e) => setCallId(e.target.value)}
-           />
-           <button onClick={() => callUser(callId)}>Call</button>
-           <button onClick={endCall}>End Call</button>
-           {incomingCall && (
-             <div>
-               <h3>Incoming Call</h3>
-               <button onClick={answerCall}>Answer</button>
-               <button onClick={declineCall}>Decline</button>
-             </div>
-           )}
-           <audio ref={remoteAudioRef} autoPlay></audio>
-         </div>
-       )}
-     </div>
+          <input
+            type="text"
+            placeholder="Enter your ID"
+            value={inputPeerId}
+            onChange={(e) => setInputPeerId(e.target.value)}
+          />
+          <button onClick={initializePeer}>Set My ID</button>
+        </div>
+      ) : (
+        <div>
+          <h2>Your ID: {peerId}</h2>
+          <input
+            type="text"
+            placeholder="Enter recipient ID"
+            value={callId}
+            onChange={(e) => setCallId(e.target.value)}
+          />
+          <button onClick={() => callUser(callId)}>Call</button>
+          <button onClick={endCall}>End Call</button>
+          {incomingCall && (
+            <div>
+              <h3>Incoming Call</h3>
+              <button onClick={answerCall}>Answer</button>
+              <button onClick={declineCall}>Decline</button>
+            </div>
+          )}
+          <audio ref={remoteAudioRef} autoPlay></audio>
+          <audio ref={localAudioRef} autoPlay muted></audio> {/* Local audio playback with mute */}
+        </div>
+      )}
+    </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+// // Ensure this is at the top of your component file to make it a client component
+// "use client";
+
+// import { useState, useEffect, useRef } from 'react';
+// import Peer from 'peerjs';
+
+// export default function Home() {
+//     const [peerId, setPeerId] = useState('');
+//        const [inputPeerId, setInputPeerId] = useState('');
+//        const [callId, setCallId] = useState('');
+//        const [peer, setPeer] = useState(null);
+//        const [localStream, setLocalStream] = useState(null);
+//        const [call, setCall] = useState(null);
+//        const [incomingCall, setIncomingCall] = useState(null);
+//        const remoteAudioRef = useRef();
+    
+//        useEffect(() => {
+//          if (peerId) {
+//            const peerInstance = new Peer(peerId);
+    
+//            peerInstance.on('open', id => {
+//              setPeerId(id);
+//            });
+    
+//            peerInstance.on('call', incomingCall => {
+//              setIncomingCall(incomingCall);
+//            });
+    
+//            peerInstance.on('error', err => {
+//              console.error('PeerJS error:', err);
+//            });
+    
+//            setPeer(peerInstance);
+    
+//            return () => {
+//              peerInstance.destroy();
+//            };
+//          }
+//        }, [peerId]);
+
+
+//     const initializePeer = () => {
+//         setPeerId(inputPeerId);
+//     };
+
+    
+
+//   const answerCall = () => {
+//     navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+//       setLocalStream(stream);
+//       incomingCall.answer(stream);
+//       incomingCall.on('stream', remoteStream => {
+//         remoteAudioRef.current.srcObject = remoteStream;
+//       });
+//       setCall(incomingCall);
+//       setIncomingCall(null);
+//     });
+//   };
+
+//   const declineCall = () => {
+//     if (incomingCall) {
+//       incomingCall.close();
+//       setIncomingCall(null);
+//     }
+//   };
+
+//   const callUser = (id) => {
+//     navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+//       setLocalStream(stream);
+//       const outgoingCall = peer.call(id, stream);
+//       outgoingCall.on('stream', remoteStream => {
+//         remoteAudioRef.current.srcObject = remoteStream;
+//       });
+//       setCall(outgoingCall);
+//     });
+//   };
+
+//   const endCall = () => {
+//     if (call) {
+//       call.close();
+//       setCall(null);
+//     }
+//     if (localStream) {
+//       localStream.getTracks().forEach(track => track.stop());
+//       setLocalStream(null);
+//     }
+//     remoteAudioRef.current.srcObject = null;
+//   };
+
+//   return (
+//     <div>
+//       <h1>PeerJS Voice Call</h1>
+//       {!peerId ? (
+//         <div>
+//            <input
+//              type="text"
+//              placeholder="Enter your ID"
+//              value={inputPeerId}
+//              onChange={(e) => setInputPeerId(e.target.value)}
+//            />
+//            <button onClick={initializePeer}>Set My ID</button>
+//          </div>
+//        ) : (
+//          <div>
+//            <h2>Your ID: {peerId}</h2>
+//            <input
+//              type="text"
+//              placeholder="Enter recipient ID"
+//              value={callId}
+//              onChange={(e) => setCallId(e.target.value)}
+//            />
+//            <button onClick={() => callUser(callId)}>Call</button>
+//            <button onClick={endCall}>End Call</button>
+//            {incomingCall && (
+//              <div>
+//                <h3>Incoming Call</h3>
+//                <button onClick={answerCall}>Answer</button>
+//                <button onClick={declineCall}>Decline</button>
+//              </div>
+//            )}
+//            <audio ref={remoteAudioRef} autoPlay></audio>
+//          </div>
+//        )}
+//      </div>
+//   );
+// }
 
 
 
