@@ -1,7 +1,9 @@
+"use client";
+
 import { useState, useEffect, useRef } from 'react';
 import Peer from 'peerjs';
 
-export default function Home() {
+export default function Head() {
   const [peerId, setPeerId] = useState('');
   const [inputPeerId, setInputPeerId] = useState('');
   const [callId, setCallId] = useState('');
