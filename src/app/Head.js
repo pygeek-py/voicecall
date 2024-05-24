@@ -229,6 +229,9 @@
 import { useState, useEffect, useRef } from 'react';
 import Peer from 'peerjs';
 
+
+
+
 export default function Home() {
   const [peerId, setPeerId] = useState('');
   const [inputPeerId, setInputPeerId] = useState('');
@@ -241,9 +244,7 @@ export default function Home() {
 
   useEffect(() => {
     if (peerId) {
-      const peerInstance = new Peer(peerId, {
-        
-      });
+      const peerInstance = new Peer(peerId);
 
       peerInstance.on('open', id => {
         setPeerId(id);
